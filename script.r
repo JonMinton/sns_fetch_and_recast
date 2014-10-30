@@ -130,7 +130,7 @@ fn <- function(this_table_name){
   write.csv(
     this_table,
     file=paste0(
-      "output_data/",
+      "output_data/by_year/",
       this_table_name,
       ".csv"
       ),
@@ -139,6 +139,273 @@ fn <- function(this_table_name){
 }
 
 l_ply(names(tables_year), fn, .progress="text")
+
+
+# Now with quarter
+
+file_df_qtrs <- subset(
+  file_df,
+  subset=period_structure=="year_quarter"
+  )
+
+year_qtrs <- str_split(
+  file_df_qtrs$table_period,
+  "Q"
+  )
+
+year_qtrs <- ldply(year_qtrs)
+names(year_qtrs) <- c("year", "quarter")
+year_qtrs <- apply(year_qtrs, 2, as.numeric)
+
+file_df_qtrs <- cbind(
+  file_df_qtrs,
+  year_qtrs
+  )
+
+
+fn_year_qtr <- function(x, dir_loc){
+  
+  this_table_name <- x$table_name[1]
+  this_table_name <- tolower(this_table_name)
+  this_table_name <- str_replace_all(this_table_name, " ", "_")
+  
+  fn_inner <- function(xx, dir_loc_){
+    
+    this_filename <- xx$full_filename[1]
+    this_year <- xx$year[1]
+    this_quarter <- xx$quarter
+    dta <- read.csv(
+      paste(
+        dir_loc_,
+        this_filename,
+        sep="/"
+      ),
+      header=T
+    )
+    
+    dta <- dta[-1,]
+    names(dta[1]) <- "datazone"
+    dta$year <- this_year
+    dta$quarter <- this_quarter
+    dta[,-1] <- apply(dta[,-1], 2, as.numeric)
+    return(dta)      
+  }
+  
+  assign(
+    this_table_name, 
+    ddply(x, .(table_period), fn_inner, dir_loc_=dir_loc)
+  )     
+  return(get(this_table_name))
+}
+
+tables_year_qtr <- dlply(
+  file_df_qtrs,
+  .(table_name),
+  fn_year_qtr,
+  dir_loc=sns_dir
+)
+
+
+tables_year_qtr <- llply(tables_year_qtr, remove.vars, names="table_period", info=F)
+tables_year_qtr <- llply(tables_year_qtr, rename.vars, from="X", to="datazone", info=F)
+tables_year_qtr <- llply(tables_year_qtr, arrange, year, quarter, datazone)
+
+
+names(tables_year_qtr) <- tolower(
+  str_replace_all(
+    names(tables_year_qtr),  " ", "_"
+  )
+)
+
+# Spool to csv files
+
+fn <- function(this_table_name){
+  this_table <- tables_year_qtr[[this_table_name]]
+  
+  write.csv(
+    this_table,
+    file=paste0(
+      "output_data/by_year_quarter/",
+      this_table_name,
+      ".csv"
+    ),
+    row.names=F
+  )
+}
+
+l_ply(names(tables_year_qtr), fn, .progress="text")
+
+
+#########################################################################
+
+# Now with months
+
+file_df_mnths <- subset(
+  file_df,
+  subset=period_structure=="year_month"
+)
+
+year_mnths <- str_split(
+  file_df_mnths$table_period,
+  "M"
+)
+
+year_mnths <- ldply(year_mnths)
+names(year_mnths) <- c("year", "month")
+year_mnths <- apply(year_mnths, 2, as.numeric)
+
+file_df_mnths <- cbind(
+  file_df_mnths,
+  year_mnths
+)
+
+
+fn_year_mnth <- function(x, dir_loc){
+  
+  this_table_name <- x$table_name[1]
+  this_table_name <- tolower(this_table_name)
+  this_table_name <- str_replace_all(this_table_name, " ", "_")
+  
+  fn_inner <- function(xx, dir_loc_){
+    
+    this_filename <- xx$full_filename[1]
+    this_year <- xx$year[1]
+    this_month <- xx$month[1]
+    dta <- read.csv(
+      paste(
+        dir_loc_,
+        this_filename,
+        sep="/"
+      ),
+      header=T
+    )
+    
+    dta <- dta[-1,]
+    names(dta[1]) <- "datazone"
+    dta$year <- this_year
+    dta$month <- this_month
+    dta[,-1] <- apply(dta[,-1], 2, as.numeric)
+    return(dta)      
+  }
+  
+  assign(
+    this_table_name, 
+    ddply(x, .(table_period), fn_inner, dir_loc_=dir_loc)
+  )     
+  return(get(this_table_name))
+}
+
+tables_year_months <- dlply(
+  file_df_mnths,
+  .(table_name),
+  fn_year_mnth,
+  dir_loc=sns_dir
+)
+
+
+tables_year_months <- llply(tables_year_months, remove.vars, names="table_period", info=F)
+tables_year_months <- llply(tables_year_months, rename.vars, from="X", to="datazone", info=F)
+tables_year_months <- llply(tables_year_months, arrange, year, month, datazone)
+
+
+names(tables_year_months) <- tolower(
+  str_replace_all(
+    names(tables_year_months),  " ", "_"
+  )
+)
+
+# Spool to csv files
+
+fn <- function(this_table_name){
+  this_table <- tables_year_months[[this_table_name]]
+  
+  write.csv(
+    this_table,
+    file=paste0(
+      "output_data/by_year_month/",
+      this_table_name,
+      ".csv"
+    ),
+    row.names=F
+  )
+}
+
+l_ply(names(tables_year_months), fn, .progress="text")
+
+
+###############################################################
+# Now to aggregate the data that are by year and quarter
+# or year and month, to year only
+
+fn <- function(x){
+  x$quarter <- NULL
+  x <- recast(x, year + datazone ~ ..., id.var=c("year", "datazone"), 
+              fun=sum,
+              na.rm=T
+              )
+  return(x)
+}
+
+
+tables_year_qtr_to_year <- llply(
+  tables_year_qtr,
+  fn,
+  .progress="text"
+  )
+
+
+fn <- function(this_table_name){
+  this_table <- tables_year_qtr_to_year[[this_table_name]]
+  
+  write.csv(
+    this_table,
+    file=paste0(
+      "output_data/by_year_aggregated/",
+      this_table_name,
+      ".csv"
+    ),
+    row.names=F
+  )
+}
+
+l_ply(names(tables_year_qtr_to_year), fn, .progress="text")
+
+# Now for month
+
+fn <- function(x){
+  x$month <- NULL
+  x <- recast(x, year + datazone ~ ..., id.var=c("year", "datazone"), 
+              fun=sum,
+              na.rm=T
+              )
+  return(x)
+}
+
+
+tables_year_month_to_year <- llply(
+  tables_year_months,
+  fn
+)
+
+fn <- function(this_table_name){
+  this_table <- tables_year_month_to_year[[this_table_name]]
+  
+  write.csv(
+    this_table,
+    file=paste0(
+      "output_data/by_year_aggregated/",
+      this_table_name,
+      ".csv"
+    ),
+    row.names=F
+  )
+}
+
+l_ply(names(tables_year_month_to_year), fn, .progress="text")
+
+
+
+########################################
 
 
 # Want to process separately by structure of period variables

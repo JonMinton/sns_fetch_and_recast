@@ -12,7 +12,11 @@ require(gdata)
 ########################################################################
 # add sns_dir locations
 
+# home dir
 sns_dir <- "G:/dropbox/Dropbox/Data/SNS_FullData_CSV_14_3_2013"
+
+# office dir
+#sns_dir <- "E:/Dropbox/Data/SNS_FullData_CSV_14_3_2013"
 
 
 ##########################################################################

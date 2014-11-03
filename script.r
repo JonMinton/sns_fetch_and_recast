@@ -603,9 +603,35 @@ l_ply(names(tables_year_start_end), fn, .progress="text")
 
 ################################################################
 
+require(plyr)
+require(string_r)
+
+# Collect and compile list of variables names 
+
+sns_dir <- "G:/dropbox/Dropbox/Data/SNS_FullData_CSV_14_3_2013"
+meta_files <- dir(sns_dir, pattern="^FullC[0-9]R0IndicatorMetaData")
+all_inputs <- lapply(paste(sns_dir, meta_files, sep="/"), readLines)
+
+# 4: identifier
+# 12: title
+# 13: ShortTitle
+# 14: ValueType
+
+fn <- function(x){
+  identifiers <- str_replace_all(str_split(x[4], ","), "\\"", "")
+  titles <- str_replace_all(str_split(x[12], ","), "\\"", "")
+  short_titles <- str_replace_all(str_split(x[13], ","), "\\"", "")
+  value_types <- str_replace_all(str_split(x[14], ","), "\\"", "")
+  browser()  
+
+}
+
+tmp <- ldply(all_inputs, fn)
 
 
 
+#####################################################################################################
+#####################################################################################################
 #################################################################
 # Want to process separately by structure of period variables
 # First, I want to just find the variables that are years: these 
@@ -953,88 +979,6 @@ write.csv(all_simplified_data, "all_simplified_data.csv")
 
 ###################################
 
-# Access to services
-
-# Drive time
-Access to Services_2047_Drive Time
-Years: 2003 2006 2009
-
-Public transport times
-Access to Services_2047_Public Transport Times
-Years: 2006 2009
-
-# Community Care
-
-Community Care_2189_Number of Care Homes
-Years: 2000:2006
-
-Community Care_2189_Places in Care Homes
-Years: 2000:2006
-
-Community Care_2189_Occupancy rate in Care Homes
-Years: 2003:2005
-
-Community Care_2189_Ensuite places in care homes
-Years: 2003:2005
-
-Community Care_2189_Places in single roooms in care homes
-Years: 2003:2005
-
-# Crime and Justice
-
-Crimes and offences recorded by the police
-Crime and Justice_2267_SIMD Crime and offences recorded by the police)
-Years: 2004, 2007/2008 (combined)
-
-
-# Economic Activity Benefits and Tax Credits
-Economic Activity Benefits and Tax Credits_2041_Income Deprivation
-Years: 2002, 2005, 2008, 2008/2009, 2009/2010
-
-Economic Activity Benefits and Tax Credits_2041_Employment Deprivation
-Years: 2002, 2005, 2008, 2009, 2010
-
-Economic Activity Benefits and Tax Credits_2041_Working Age Claimants of Benefi
-Years: 1999:2011
-Quarters: 1:4
-
-Economic Activity Benefits and Tax Credits_2041_Child Benefit
-Years: 2003:2011
-
-Economic Activity Benefits and Tax Credits_2041_Retirement Pension
-Years: 2002:2011
-Quarters: 1:4
-
-Economic Activity Benefits and Tax Credits_2041_Income Support
-Years: 1999: 2011
-Quarters: 1:4
-
-Economic Activity Benefits and Tax Credits_2041_Pension Credits
-Years: 2003:2011
-Quarters: 1:4
-
-Economic Activity Benefits and Tax Credits_2041_Comparative Illness
-Years: 2003:2010
-
-Economic Activity Benefits and Tax Credits_2041_Workless Client Group
-Years: 1999:2011
-Quarters: 1:4
-
-Economic Activity Benefits and Tax Credits_2041_Job Seekers Allowance
-Years: 1999:2011
-Quarters: 1:4
-
-Economic Activity Benefits and Tax Credits_2041_Incapacity Benefit and Severe D
-Years: 1999:2011
-Quarters: 1:4
-
-Economic Activity Benefits and Tax Credits_2041_Attendance Allowance
-Years: 2008:2011
-Quarters: 1:4
-
-Economic Activity Benefits and Tax Credits_2041_Attendance Allowance
-Years: 2008:2011
-Quarters: 1:4
 
 
 

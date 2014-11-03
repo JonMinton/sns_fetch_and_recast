@@ -608,7 +608,7 @@ l_ply(names(tables_year_start_end), fn, .progress="text")
 ################################################################
 
 require(plyr)
-require(string_r)
+require(stringr)
 
 # Collect and compile list of variables names 
 
@@ -622,12 +622,35 @@ all_inputs <- lapply(paste(sns_dir, meta_files, sep="/"), readLines)
 # 14: ValueType
 
 fn <- function(x){
-  identifiers <- str_replace_all(str_split(x[4], ","), "\\"", "")
-  titles <- str_replace_all(str_split(x[12], ","), "\\"", "")
-  short_titles <- str_replace_all(str_split(x[13], ","), "\\"", "")
-  value_types <- str_replace_all(str_split(x[14], ","), "\\"", "")
-  browser()  
-
+  identifiers <- str_replace_all(str_split(x[4], ",")[[1]], '\"', "")
+  titles <- str_replace_all(str_split(x[12], ",")[[1]], '\"', "")
+  short_titles <- str_replace_all(str_split(x[13], ",")[[1]], '\"', "")
+  value_types <- str_replace_all(str_split(x[14], ",")[[1]], '\"', "")
+  
+  max_length <- max(
+    length(identifiers) ,
+    length(titles) ,
+    length(short_titles),
+    length(value_types)
+    )
+  
+  identifier <- rep("", max_length)
+  title <- rep("", max_length)
+  short_title <- rep("", max_length)
+  value_type <- rep("", max_length)
+  
+  identifier[1:(length(identifiers)-1)] <- identifiers[-1]
+  title[1:(length(titles)-1)] <- titles[-1]
+  short_title[1:(length(short_title)-1)] <- short_title[-1]
+  value_type[1:(length(value_type)-1)] <- value_type[-1]
+  
+  out <- data.frame(
+    identifier = identifier,
+    title = title,
+    short_title = short_title,
+    value_type = value_type
+    )
+  return(out)
 }
 
 tmp <- ldply(all_inputs, fn)

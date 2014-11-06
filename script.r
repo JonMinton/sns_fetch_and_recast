@@ -1,4 +1,4 @@
-# loack packages
+# load packages
 
 
 require(plyr)
@@ -6,9 +6,24 @@ require(reshape2)
 require(stringr)
 require(ggplot2)
 require(gdata)
+require(foreign)
 
 
+##########################################################################
+# Link datazones to postcodes
 
+# Suggestion by Christina
+
+# Dropbox link to file:
+# https://www.dropbox.com/s/373otkkuo1fdpht/latestpcinfowithlinkpc.sav?dl=0
+areal_unit_local_location <- "G:/dropbox/Dropbox/Data/Links_between_Areal_Units/latestpcinfowithlinkpc.sav"
+areal_unit_link <- "https://www.dropbox.com/s/373otkkuo1fdpht/latestpcinfowithlinkpc.sav?dl=0"
+
+tmp <- read.spss(areal_unit_local_location, to.data.frame=T)
+
+datazone_to_postcode <- tmp[,c("PostcodeFull", "PCSector", "PCDistrict","Datazone")]
+names(datazone_to_postcode) <- tolower(names(datazone_to_postcode))
+write.csv(datazone_to_postcode, file="output_data/postcode_links/datazone_to_postcode.csv")
 ########################################################################
 # add sns_dir locations
 

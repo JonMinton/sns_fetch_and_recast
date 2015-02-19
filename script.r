@@ -1090,3 +1090,46 @@ west_end_dzs  <- c(
 )
 
 
+
+###############################################################################################################################
+###############################################################################################################################
+
+# 19/2/2015
+
+# Some code to merge the data on urban_rural classifications found by Gavin
+
+rm(list=ls())
+
+# install.packages("plyr")
+# install.packages("stringr")
+# install.packages("tidyr")
+# install.packages("dplyr")
+
+
+require(plyr)
+require(stringr)
+require(tidyr)
+require(dplyr)
+
+base_dir <- "E:/Dropbox/Data/SNS/urban_rural"
+
+files_to_load <- list.files(path=paste(base_dir, "raw", sep="/"))
+
+fn <- function(x){
+  in_file <- read.csv(
+    paste(base_dir, "raw", x, sep="/")
+    ) %>% tbl_df()
+  
+  out <- in_file %>% 
+    rename(datazone=GeographyCode) %>% 
+    gather(key=year, value=urban_rural_class, -datazone)
+  
+  return(out)
+}
+
+output <- ldply(files_to_load, fn) %>% tbl_df
+output$year <- output$year %>% 
+  str_replace_all("X", "") %>% 
+  str_replace_all("\\.", "_") 
+
+write.csv(output, paste(base_dir, "tidied", "urban_rural.csv", sep="/"), row.names=F)

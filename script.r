@@ -9,27 +9,27 @@ require(gdata)
 require(foreign)
 
 
-##########################################################################
-# Link datazones to postcodes
-
-# Suggestion by Christina
-
-# Dropbox link to file:
-# https://www.dropbox.com/s/373otkkuo1fdpht/latestpcinfowithlinkpc.sav?dl=0
-areal_unit_local_location <- "G:/dropbox/Dropbox/Data/Links_between_Areal_Units/latestpcinfowithlinkpc.sav"
-areal_unit_link <- "https://www.dropbox.com/s/373otkkuo1fdpht/latestpcinfowithlinkpc.sav?dl=0"
-
-tmp <- read.spss(areal_unit_local_location, to.data.frame=T)
-
-datazone_to_postcode <- tmp[,c("PostcodeFull", "PCSector", "PCDistrict","Datazone")]
-names(datazone_to_postcode) <- tolower(names(datazone_to_postcode))
-write.csv(datazone_to_postcode, file="output_data/postcode_links/datazone_to_postcode.csv")
-########################################################################
+# ##########################################################################
+# # Link datazones to postcodes
+# 
+# # Suggestion by Christina
+# 
+# # Dropbox link to file:
+# # https://www.dropbox.com/s/373otkkuo1fdpht/latestpcinfowithlinkpc.sav?dl=0
+# areal_unit_local_location <- "G:/dropbox/Dropbox/Data/Links_between_Areal_Units/latestpcinfowithlinkpc.sav"
+# areal_unit_link <- "https://www.dropbox.com/s/373otkkuo1fdpht/latestpcinfowithlinkpc.sav?dl=0"
+# 
+# tmp <- read.spss(areal_unit_local_location, to.data.frame=T)
+# 
+# datazone_to_postcode <- tmp[,c("PostcodeFull", "PCSector", "PCDistrict","Datazone")]
+# names(datazone_to_postcode) <- tolower(names(datazone_to_postcode))
+# write.csv(datazone_to_postcode, file="output_data/postcode_links/datazone_to_postcode.csv")
+# ########################################################################
 # add sns_dir locations
 
 # home dir
-sns_dir <- "G:/dropbox/Dropbox/Data/SNS_FullData_CSV_14_3_2013"
-
+#sns_dir <- "G:/dropbox/Dropbox/Data/SNS_FullData_CSV_14_3_2013"
+sns_dir <- "E:/Dropbox/Data/SNS_FullData_CSV_19_1_2015"
 # office dir
 #sns_dir <- "E:/Dropbox/Data/SNS_FullData_CSV_14_3_2013"
 
@@ -40,7 +40,8 @@ sns_dir <- "G:/dropbox/Dropbox/Data/SNS_FullData_CSV_14_3_2013"
 # Want to know how many files have ZN in their title
 length(list.files(path=sns_dir))
 
-# length is 2498 files
+# length is 2498 files [2013]
+# Length is now 6238 files!
 
 # Now how many have _ZN_ in their title?
 
@@ -50,6 +51,7 @@ length(list.files(
   )
 )
 
+#1651 (2015)
 relevant_filenames <- list.files(
   path=sns_dir,
   pattern="_ZN_"
@@ -127,7 +129,8 @@ tables_year <- dlply(
   subset(file_df, subset=period_structure=="year"),
   .(table_name),
   fn_year,
-  dir_loc=sns_dir
+  dir_loc=sns_dir,
+  .progress="text"
   )
 
 tables_year <- llply(tables_year, remove.vars, names="table_period", info=F)
@@ -221,7 +224,8 @@ tables_year_qtr <- dlply(
   file_df_qtrs,
   .(table_name),
   fn_year_qtr,
-  dir_loc=sns_dir
+  dir_loc=sns_dir,
+  .progress="text"
 )
 
 

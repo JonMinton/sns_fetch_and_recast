@@ -1,5 +1,6 @@
 # load packages
-
+rm(list=ls())
+gc()
 
 require(plyr)
 require(reshape2)
@@ -91,6 +92,7 @@ file_df$period_structure[
   ] <- "year_startend"
 
 
+
 # Let's start just with year_structure variables
 
 fn_year <- function(x, dir_loc){
@@ -163,6 +165,7 @@ fn <- function(this_table_name){
 l_ply(names(tables_year), fn, .progress="text")
 
 
+
 # Now with quarter
 
 file_df_qtrs <- subset(
@@ -195,7 +198,7 @@ fn_year_qtr <- function(x, dir_loc){
     
     this_filename <- xx$full_filename[1]
     this_year <- xx$year[1]
-    this_quarter <- xx$quarter
+    this_quarter <- xx$quarter[1]
     dta <- read.csv(
       paste(
         dir_loc_,
@@ -205,14 +208,14 @@ fn_year_qtr <- function(x, dir_loc){
       header=T
     )
     
-    dta <- dta[-1,]
-    names(dta[1]) <- "datazone"
+    dta <- dta[-1,] 
+    names(dta)[1] <- "datazone"
     dta$year <- this_year
     dta$quarter <- this_quarter
     dta[,-1] <- apply(dta[,-1], 2, as.numeric)
     return(dta)      
   }
-  
+
   assign(
     this_table_name, 
     ddply(x, .(table_period), fn_inner, dir_loc_=dir_loc)

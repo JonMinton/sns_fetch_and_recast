@@ -628,474 +628,100 @@ l_ply(names(tables_year_start_end), fn, .progress="text")
 
 
 ################################################################
-
+rm(list=ls())
 require(plyr)
 require(stringr)
 
 # Collect and compile list of variables names 
 
-sns_dir <- "G:/dropbox/Dropbox/Data/SNS_FullData_CSV_14_3_2013"
+sns_dir <- "E:/Dropbox/Data/SNS_FullData_CSV_19_1_2015"
 meta_files <- dir(sns_dir, pattern="^FullC[0-9]R0IndicatorMetaData")
-all_inputs <- lapply(paste(sns_dir, meta_files, sep="/"), readLines)
 
-# 4: identifier
-# 12: title
-# 13: ShortTitle
-# 14: ValueType
+all_inputs <- lapply(paste(sns_dir, meta_files, sep="/"), read.table, sep=",")
+all_inputs <- ldply(all_inputs, 
+                    function(x) {
+                      out <- as.matrix(x); 
+                      out <- t(out); 
+                      colnms <- out[1,]; 
+                      out <- out[-1,]; 
+                      colnames(out) <- colnms; 
+                      out <- data.frame(out); 
+                      return(out)
+                      }
+                    ) 
+
+# Now to link to the new tables
+
+
+
+
+require(dplyr)
+
+base_dir <- "output_data"
+
+
+all_files <- list.files(base_dir, include.dirs=T, recursive=T, pattern=".csv$")
+all_files <- all_files[-1]
+all_files <- all_files[-length(all_files)]
 
 fn <- function(x){
-  identifiers <- str_replace_all(str_split(x[4], ",")[[1]], '\"', "")
-  titles <- str_replace_all(str_split(x[12], ",")[[1]], '\"', "")
-  short_titles <- str_replace_all(str_split(x[13], ",")[[1]], '\"', "")
-  value_types <- str_replace_all(str_split(x[14], ",")[[1]], '\"', "")
+  file_name <- paste(base_dir, x, sep="/")
   
-  max_length <- max(
-    length(identifiers) ,
-    length(titles) ,
-    length(short_titles),
-    length(value_types)
-    )
+  this_file <- read.csv(file_name)
   
-  identifier <- rep("", max_length)
-  title <- rep("", max_length)
-  short_title <- rep("", max_length)
-  value_type <- rep("", max_length)
+  min_year <- min(this_file$year)
+  max_year <- max(this_file$year)
+  var_names <- this_file %>% 
+    select(-datazone, -year) %>% 
+    names
   
-  identifier[1:(length(identifiers)-1)] <- identifiers[-1]
-  title[1:(length(titles)-1)] <- titles[-1]
-  short_title[1:(length(short_title)-1)] <- short_title[-1]
-  value_type[1:(length(value_type)-1)] <- value_type[-1]
-  
-  out <- data.frame(
-    identifier = identifier,
-    title = title,
-    short_title = short_title,
-    value_type = value_type
-    )
+  tmp <- str_split(x, "/")[[1]]
+  if (length(tmp)!=2){ 
+    out <- NULL
+  } else {
+    dir_name <- tmp[1]
+    file_name <- str_replace(tmp[2], ".csv$", "")
+    
+    out <- data.frame(
+      dir_name=dir_name,
+      file_name=file_name,
+      var_name=var_names,
+      min_year=min_year,
+      max_year=max_year
+    ) 
+  }    
   return(out)
 }
 
-tmp <- ldply(all_inputs, fn)
+output <- ldply(all_files, fn, .progress="text")
 
+output <- output %>% tbl_df %>% filter(!(var_name %in% c("year_first", "year_last", "quarter")))
 
+# 
+# write.csv(output, file="G:/dropbox/Dropbox/Data/SNS/rearranged_data/var_names_by_location.csv", row.names=F)
+# 
 
-#####################################################################################################
-#####################################################################################################
-#################################################################
-# Want to process separately by structure of period variables
-# First, I want to just find the variables that are years: these 
-# are just four characters long
+location_id <- output 
+id_desc <- all_inputs
+id_desc <- id_desc %>% tbl_df
+id_desc$simple_id <- id_desc$Identifier %>% tolower %>% str_replace_all("[-.]", "_")
 
-# Second, I want to process year_quarter variables. 
-# these are 7 characters long, with Q as the 5th character
+location_id$simple_id <- location_id$var_name %>% tolower %>% str_replace_all("[-.]", "_")
 
-# Third, I want to process year_month variables. 
-# these are 7 characters long, with M as the 5th character
+location_id_desc <- location_id %>% left_join(id_desc)
+location_id_desc <- location_id_desc %>% select(var_name, description=ShortTitle,min_year, max_year, file_name, dir_name)
 
-# Forth, I want to process adjacent year variables
-# These are in a range of formats .... misc for now
-
-
-
-
-# Council house sales 1980 to 2005
-
-years_to_read <-   1980:2005
-
-fn <- function(this_year){
-  dta <- read.csv(
-    paste0(
-      "G:/dropbox/Dropbox/Data/SNS_FullData_CSV_14_3_2013/Housing_1764_Council House Sales_",
-      this_year,
-      "_ZN_C0R0_2_7_2012.csv"
-      ),
-    header=T
-    )
-  dta <- dta[-1,]
-  names(dta)[1] <- "datazone"
-  dta[,2] <- as.numeric(dta[,2])
-  dta[,3] <- as.numeric(dta[,3])
-  dta[,4] <- as.numeric(dta[,4])
-  dta$year <- this_year
-  
-  return(dta)
-}
-
-sales_all <- ldply(
-  years_to_read,
-  fn
+write.csv(
+  location_id_desc, 
+  file="output_data/metadata/var_names_and_dir_locations.csv", 
+  row.names=F
   )
 
-
-# Council house sales for all of scotland
-
-sales_all_scotland <- ddply(
-  sales_all,
-  .(year),
-  summarise,
-  all_tenant_sales=sum(HO.alltenantsale),
-  flat_tenant_sales=sum(HO.Flattenantsale),
-  house_tenant_sales=sum(HO.Housetenantsale)
+write.csv(
+  id_desc,
+  file="output_data/metadata/all_available_var_details.csv",
+  row.names=F
   )
-
-sales_all_scotland$area <- "scotland"
-
-qplot(x=year, y=all_tenant_sales, data=sales_all_scotland, geom="line")
-# Now just for east end of glasgow
-
-sales_east_end <- subset(
-  sales_all,
-  subset=datazone %in% east_end_dzs
-  )
-
-sales_east_end_combined <- ddply(
-  sales_east_end,
-  .(year),
-  summarise,
-  all_tenant_sales=sum(HO.alltenantsale),
-  flat_tenant_sales=sum(HO.Flattenantsale),
-  house_tenant_sales=sum(HO.Housetenantsale)
-)
-
-sales_east_end_combined$area <- "east_end"
-qplot(x=year, y=all_tenant_sales, data=sales_east_end_combined, geom="line")
-
-######################
-
-sales_west_end <- subset(
-  sales_all,
-  subset=datazone %in% west_end_dzs
-)
-
-sales_west_end_combined <- ddply(
-  sales_west_end,
-  .(year),
-  summarise,
-  all_tenant_sales=sum(HO.alltenantsale),
-  flat_tenant_sales=sum(HO.Flattenantsale),
-  house_tenant_sales=sum(HO.Housetenantsale)
-)
-
-sales_west_end_combined$area <- "west_end"
-
-qplot(x=year, y=all_tenant_sales, data=sales_west_end_combined, geom="line")
-
-
-# council house sales 
-council_house_sales_combined <- rbind(
-  sales_all_scotland,
-  sales_east_end_combined,
-  sales_west_end_combined
-  )
-
-
-#### How about house price sales?
-
-
-years_to_read <-   1993:2010
-
-fn <- function(this_year){
-  dta <- read.csv(
-    paste0(
-      "G:/dropbox/Dropbox/Data/SNS_FullData_CSV_14_3_2013/Housing_2094_House sales and prices_",
-      this_year,
-      "_ZN_C0R0_2_7_2012.csv"
-    ),
-    header=T
-  )
-  dta <- dta[-1,]
-  names(dta)[1] <- "datazone"
-  dta[,2] <- as.numeric(dta[,2])
-  dta[,3] <- as.numeric(dta[,3])
-  dta[,4] <- as.numeric(dta[,4])
-  dta[,5] <- as.numeric(dta[,5])
-  
-  dta$year <- this_year
-  
-  return(dta)
-}
-
-house_prices_all <- ldply(
-  years_to_read,
-  fn
-)
-
-
-# Council house sales for all of scotland
-
-house_prices_all_scotland <- ddply(
-  house_prices_all,
-  .(year),
-  summarise,
-  house_price_lower_quartile=median(HO.hpricelquartile),
-  house_price_mean = median(HO.hpricemean),
-  house_price_median = median(HO.hpricemedian),
-  house_price_upper_quartile = median(HO.hpriceuquartile),
-  number_of_house_sales = sum(HO.hsalesno)
-)
-house_prices_all_scotland$area <- "scotland"
-
-
-qplot(x=year, y=number_of_house_sales, data=house_price_all_scotland, geom="line")
-# Now just for east end of glasgow
-
-house_prices_east_end <- subset(
-  house_prices_all,
-  subset=datazone %in% east_end_dzs
-)
-
-house_prices_all_east_end <- ddply(
-  house_prices_east_end,
-  .(year),
-  summarise,
-  house_price_lower_quartile=median(HO.hpricelquartile),
-  house_price_mean = median(HO.hpricemean),
-  house_price_median = median(HO.hpricemedian),
-  house_price_upper_quartile = median(HO.hpriceuquartile),
-  number_of_house_sales = sum(HO.hsalesno)
-)
-
-house_prices_all_east_end$area <- "east_end"
-
-
-qplot(x=year, y=number_of_house_sales, data=house_prices_all_east_end, geom="line")
-
-#####
-house_prices_west_end <- subset(
-  house_prices_all,
-  subset=datazone %in% west_end_dzs
-)
-
-house_prices_all_west_end <- ddply(
-  house_prices_west_end,
-  .(year),
-  summarise,
-  house_price_lower_quartile=median(HO.hpricelquartile),
-  house_price_mean = median(HO.hpricemean),
-  house_price_median = median(HO.hpricemedian),
-  house_price_upper_quartile = median(HO.hpriceuquartile),
-  number_of_house_sales = sum(HO.hsalesno)
-)
-
-house_prices_all_west_end$area <- "west_end"
-
-qplot(x=year, y=number_of_house_sales, data=house_prices_all_west_end, geom="line")
-
-qplot(x=year, y=house_price_median, data=house_prices_all_west_end, geom="line")
-
-qplot(x=year, y=house_price_median, data=house_prices_all_east_end, geom="line")
-
-house_prices_combined <- rbind(
-  house_prices_all_scotland,
-  house_prices_all_east_end,
-  house_prices_all_west_end
-)
-
-
-# Now JSA
-
-
-years_to_read <-   1999:2011
-quarters <- 1:4
-df <- expand.grid(
-  year=years_to_read,
-  quarter=quarters
-  )
-
-fn <- function(x){
-  this_year <- x$year
-  this_quarter <- x$quarter
-  
-  
-   dta <- try(
-     read.csv(
-       paste0(
-         "G:/dropbox/Dropbox/Data/SNS_FullData_CSV_14_3_2013/Economic Activity Benefits and Tax Credits_2250_Job Seekers Allowance_",
-         this_year,
-         "Q0",
-         this_quarter,
-         "_ZN_C0R0_2_7_2012.csv"
-       ),
-       header=T
-     )
-   )
-  
-   if (class(dta)!="try-error"){
-     dta <- dta[-1,]
-     names(dta)[1] <- "datazone"
-     dta[,2] <- as.numeric(dta[,2])
-     dta[,3] <- as.numeric(dta[,3])
-     dta[,4] <- as.numeric(dta[,4])
-     dta[,5] <- as.numeric(dta[,5])
-     dta[,6] <- as.numeric(dta[,6])
-     dta[,7] <- as.numeric(dta[,7])
-     dta$year <- this_year
-     dta$quarter <- this_quarter
-     
-     return(dta)
-          
-   }
-}
-
-jsa_all <- ddply(
-  df,
-  .(year, quarter),
-  fn
-)
-
-
-write.csv(jsa_all, "jsa_merged.csv")
-jsa_scotland <- ddply(
-  jsa_all,
-  .(year),
-  summarise,
-  jsa_claimants_16_to_24 = sum(CS.JSA_16to24),
-  jsa_claimants_25_to_49 = sum(CS.JSA_25to49),
-  jsa_claimants_50_plus = sum(CS.JSA_50plus),
-  jsa_claimants_female = sum(CS.JSA_female),
-  jsa_claimants_male = sum(CS.JSA_male),
-  jsa_claimants_total = sum(CS.JSA_total)
-  )
-
-jsa_scotland$area <- "scotland"
-
-
-jsa_east_end <- subset(
-  jsa_all,
-  subset=datazone %in% east_end_dzs
-)
-
-jsa_all_east_end <- ddply(
-  jsa_east_end,
-  .(year),
-  summarise,
-  jsa_claimants_16_to_24 = sum(CS.JSA_16to24),
-  jsa_claimants_25_to_49 = sum(CS.JSA_25to49),
-  jsa_claimants_50_plus = sum(CS.JSA_50plus),
-  jsa_claimants_female = sum(CS.JSA_female),
-  jsa_claimants_male = sum(CS.JSA_male),
-  jsa_claimants_total = sum(CS.JSA_total)
-)
-
-jsa_all_east_end$area <- "east_end"
-
-#####
-jsa_west_end <- subset(
-  jsa_all,
-  subset=datazone %in% west_end_dzs
-)
-
-jsa_all_west_end <- ddply(
-  jsa_west_end,
-  .(year),
-  summarise,
-  jsa_claimants_16_to_24 = sum(CS.JSA_16to24),
-  jsa_claimants_25_to_49 = sum(CS.JSA_25to49),
-  jsa_claimants_50_plus = sum(CS.JSA_50plus),
-  jsa_claimants_female = sum(CS.JSA_female),
-  jsa_claimants_male = sum(CS.JSA_male),
-  jsa_claimants_total = sum(CS.JSA_total)
-)
-
-jsa_all_west_end$area <- "west_end"
-
-###########
-
-# Combine all into a single dataset
-
-jsa_combined <- rbind(
-  jsa_scotland,
-  jsa_all_east_end,
-  jsa_all_west_end
-  )
-
-
-
-# join all to a single dataset
-
-all_simplified_data <- join(
-  council_house_sales_combined,
-  house_prices_combined  
-  )
-
-all_simplified_data <- join(
-  all_simplified_data,
-  jsa_combined
-  )
-
-write.csv(all_simplified_data, "all_simplified_data.csv")
-
-
-###################################
-
-
-
-
-
-# datazones for east end of Glasgow
-east_end_dzs <- c(
-  "S01003205",
-  "S01003248",
-  "S01003251",
-  "S01003254",
-  "S01003263",
-  "S01003270",
-  "S01003271",
-  "S01003328",
-  "S01003335",
-  "S01003313",
-  "S01003331",
-  "S01003333",
-  "S01003355",
-  "S01003368",
-  "S01003279",
-  "S01003347",
-  "S01003201",
-  "S01003217",
-  "S01003342",
-  "S01003353",
-  "S01003253",
-  "S01003269",
-  "S01003273",
-  "S01003289",
-  "S01003296",
-  "S01003299",
-  "S01003314"
-)
-# 27 Dzs 
-# Source: http://www.scotland.gov.uk/Topics/ArtsCultureSport/Sport/MajorEvents/Glasgow-2014/Commonwealth-games/Indicators/S9
-
-# 27 West End Datazones
-west_end_dzs  <- c(
-  "S01003437",
-  "S01003450",
-  "S01003453",
-  "S01003454",
-  "S01003460",
-  "S01003464",
-  "S01003466",
-  "S01003468",
-  "S01003470",
-  "S01003474",
-  "S01003478",
-  "S01003479",
-  "S01003484",
-  "S01003485",
-  "S01003487",
-  "S01003497",
-  "S01003501",
-  "S01003503",
-  "S01003504",
-  "S01003509",
-  "S01003513",
-  "S01003514",
-  "S01003520",
-  "S01003521",
-  "S01003522",
-  "S01003542",
-  "S01003545"
-)
-
 
 
 ###############################################################################################################################

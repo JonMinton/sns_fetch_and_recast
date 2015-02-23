@@ -766,3 +766,56 @@ output$year <- output$year %>%
   str_replace_all("\\.", "_") 
 
 write.csv(output, paste(base_dir, "tidied", "urban_rural.csv", sep="/"), row.names=F)
+
+
+
+
+###########
+
+# Var_identification ------------------------------------------------------
+
+
+# Not all variables are available at datazone level. The purpose of the code below is to:
+# report at what Geographic levels different variables are available.
+
+rm(list=ls())
+
+require(stringr)
+require(tidyr)
+require(plyr)
+require(dplyr)
+
+base_dir <- "E:/Dropbox/Data/SNS_FullData_CSV_19_1_2015/"
+
+
+files_to_parse <- list.files(base_dir)
+files_not_to_parse <- list.files(base_dir, pattern="^QuarterlyC[0-9]{1}R[0-9]{1}")
+files_to_parse <- files_to_parse[!(files_to_parse %in% files_not_to_parse)]
+
+fn <- function(x){
+  first_two_lines <- readLines(
+    paste0(base_dir, x),
+    n=2
+    ) %>%
+    str_split(",")
+  
+  file_name <- x
+  tokens <- file_name %>%
+    str_replace("_C[0-9]{1}R[0-9]{1}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,4}\\.csv$", "") %>%
+    str_split("_") %>%
+    unlist
+
+  vars <- first_two_lines[[1]][-1]
+  years <- first_two_lines[[2]][-1] %>%
+    unique
+  
+  out <- expand.grid(var=vars, year=years)
+  if(dim(out)[1]>0){
+    out <- data.frame(out, outer_group=tokens[1], inner_group=tokens[2], areal_unit=tokens[4])    
+  } else {out <- NULL}
+  
+  
+  return(out)
+}
+
+var_compilation <- ldply(files_to_parse, fn, .progress="text")

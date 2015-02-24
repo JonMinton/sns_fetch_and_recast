@@ -826,31 +826,39 @@ fn <- function(x){
 var_compilation <- ldply(files_to_parse, fn, .progress="text") %>%
   tbl_df
 
-fn <- function(x){
-  au_name <- as.character(x$areal_unit[1])
-  x$areal_unit <- TRUE
-  names(x)[names(x)=="areal_unit"] <- au_name
-  return(x)
-}
-
-var_by_au <- var_compilation %>%
-  dlply(.(areal_unit), fn)
-
-
-# This crashes the system
-
-# var_by_au_wide <- var_by_au[[1]] %>%
-#   select(-file_name)
-# 
-# for (i in 2:length(var_by_au)){
-#   var_by_au_wide <- var_by_au_wide %>%
-#     full_join(var_by_au[[i]]  %>% select(-file_name))
-# }
-
-
-
-# Simple example
-
-dta <- data.frame(
+var_by_au <- var_compilation  %>% 
+  distinct  %>% 
+  mutate(tmp=1)  %>% 
+  spread(areal_unit, tmp, fill=FALSE) %>%
+  select(-inner_group, -file_name) %>%
+  group_by(var) %>%
+  summarise(
+    LA=ifelse(sum(LA) > 0, 1, 0),
+    SC=ifelse(sum(SC) > 0, 1, 0),
+    ZN=ifelse(sum(ZN) > 0, 1, 0),
+    IG=ifelse(sum(IG) > 0, 1, 0),
+    H2=ifelse(sum(H2) > 0, 1, 0),
+    CH=ifelse(sum(CH) > 0, 1, 0),
+    HB=ifelse(sum(HB) > 0, 1, 0),
+    P2=ifelse(sum(P2) > 0, 1, 0),
+    RC=ifelse(sum(RC) > 0, 1, 0),
+    SP=ifelse(sum(SP) > 0, 1, 0),
+    MW=ifelse(sum(MW) > 0, 1, 0),
+    RL=ifelse(sum(RL) > 0, 1, 0),
+    W2=ifelse(sum(W2) > 0, 1, 0)
+    ) %>%
+  ungroup
   
-  )
+var_details <- read.csv("E:/Dropbox/Data/SNS/2015_release/metadata/all_available_var_details.csv")  %>% 
+  select(var=Identifier, ShortTitle) %>% 
+  tbl_df
+
+var_by_au <- var_by_au  %>% 
+  left_join(var_details)  %>% 
+  select(1,15, 2:14)
+
+write.csv(var_by_au, file="E:/Dropbox/Data/SNS/2015_release/metadata/variables_by_areal_unit_availability.csv", row.names=F)
+
+# Merge with title 
+
+var_details <- read.csv("E:/Dropbox/Data/SNS/2015_release/metadata/all_available_var_details.csv")

@@ -791,6 +791,9 @@ base_dir <- "E:/Dropbox/Data/SNS_FullData_CSV_19_1_2015/"
 files_to_parse <- list.files(base_dir)
 files_not_to_parse <- list.files(base_dir, pattern="^QuarterlyC[0-9]{1}R[0-9]{1}")
 files_to_parse <- files_to_parse[!(files_to_parse %in% files_not_to_parse)]
+files_not_to_parse <- list.files(base_dir, pattern="MetaData")
+files_to_parse <- files_to_parse[!(files_to_parse %in% files_not_to_parse)]
+
 
 fn <- function(x){
   first_two_lines <- readLines(
@@ -801,21 +804,53 @@ fn <- function(x){
   
   file_name <- x
   tokens <- file_name %>%
-    str_replace("_C[0-9]{1}R[0-9]{1}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,4}\\.csv$", "") %>%
+    str_replace("_C[0-9]{1}R[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,4}\\.csv$", "") %>%
     str_split("_") %>%
     unlist
+
 
   vars <- first_two_lines[[1]][-1]
   years <- first_two_lines[[2]][-1] %>%
     unique
+  au <- tokens[length(tokens)]  
   
   out <- expand.grid(var=vars, year=years)
   if(dim(out)[1]>0){
-    out <- data.frame(out, outer_group=tokens[1], inner_group=tokens[2], areal_unit=tokens[4])    
+    out <- data.frame(out, outer_group=tokens[1], inner_group=tokens[2], areal_unit=au, file_name=file_name)    
   } else {out <- NULL}
   
   
   return(out)
 }
 
-var_compilation <- ldply(files_to_parse, fn, .progress="text")
+var_compilation <- ldply(files_to_parse, fn, .progress="text") %>%
+  tbl_df
+
+fn <- function(x){
+  au_name <- as.character(x$areal_unit[1])
+  x$areal_unit <- TRUE
+  names(x)[names(x)=="areal_unit"] <- au_name
+  return(x)
+}
+
+var_by_au <- var_compilation %>%
+  dlply(.(areal_unit), fn)
+
+
+# This crashes the system
+
+# var_by_au_wide <- var_by_au[[1]] %>%
+#   select(-file_name)
+# 
+# for (i in 2:length(var_by_au)){
+#   var_by_au_wide <- var_by_au_wide %>%
+#     full_join(var_by_au[[i]]  %>% select(-file_name))
+# }
+
+
+
+# Simple example
+
+dta <- data.frame(
+  
+  )

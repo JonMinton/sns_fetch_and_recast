@@ -1,8 +1,14 @@
+
+
+# Script for LAs
+
 # load packages
 rm(list=ls())
 gc()
 
 require(plyr)
+require(tidyr)
+require(dplyr)
 require(reshape2)
 require(stringr)
 require(ggplot2)
@@ -30,9 +36,10 @@ require(foreign)
 
 # home dir
 #sns_dir <- "G:/dropbox/Dropbox/Data/SNS_FullData_CSV_14_3_2013"
-sns_dir <- "E:/Dropbox/Data/SNS_FullData_CSV_19_1_2015"
+
 # office dir
 #sns_dir <- "E:/Dropbox/Data/SNS_FullData_CSV_14_3_2013"
+sns_dir <- "E:/Dropbox/Data/SNS_FullData_CSV_19_1_2015"
 
 
 ##########################################################################
@@ -48,16 +55,16 @@ length(list.files(path=sns_dir))
 
 length(list.files(
   path=sns_dir,
-  pattern="_ZN_"
-  )
+  pattern="_LA_"
+)
 )
 
-#1651 (2015)
+#207 (2015)
 relevant_filenames <- list.files(
   path=sns_dir,
-  pattern="_ZN_"
-  )
-# length is 1096
+  pattern="_LA_"
+)
+relevant_filenames <- relevant_filenames[!(relevant_filenames  %>% str_detect("Geographic"))]
 
 # structure is 
 # [GROUP]_[GROUP CODE] _ [table name]_[Year OR {YEAR}Q{QUARTER}]_[OTHERSTUFF]
@@ -69,7 +76,7 @@ names(file_df) <- c(
   "table_name",
   "table_period",
   "excess"
-  )
+)
 file_df$full_filename <- relevant_filenames
 
 file_df$period_structure <- "misc"
@@ -92,77 +99,89 @@ file_df$period_structure[
   ] <- "year_startend"
 
 
+# For LAs, years are not encapsulated in the filenames
+
 
 # Let's start just with year_structure variables
 
-fn_year <- function(x, dir_loc){
+fn <- function(x, dir_loc){
   
-  this_table_name <- x$table_name[1]
-  this_table_name <- tolower(this_table_name)
-  this_table_name <- str_replace_all(this_table_name, " ", "_")
-  fn_inner <- function(xx, dir_loc_){
+  this_table_name <- x$table_name[1] %>%
+    tolower %>%
+    str_replace_all(" ", "_")
+  
+  this_filename <- x$full_filename[1]
+  headers <- try(readLines(
+    paste(
+      dir_loc, 
+      this_filename,
+      sep="/"
+      ),
+    n=2
+    ) %>%
+    str_split(",") %>%
+    lapply(function(x) x[-1]) %>%
+    ldply %>% apply(2, paste, collapse=".")  %>% as.vector
+  )
+  
+  dta <- read.csv(
+    paste(
+      dir_loc,
+      this_filename,
+      sep="/"
+    ),
+    header=F,
+    skip=2
+  )  
+  
+  if (dim(dta)[1] > 0){
     
-    this_filename <- xx$full_filename[1]
-    this_year <- xx$table_period[1]
-    dta <- read.csv(
-        paste(
-          dir_loc_,
-          this_filename,
-          sep="/"
-        ),
-        header=T
-      )
-
-      dta <- dta[-1,]
-      names(dta[1]) <- "datazone"
-      dta$year <- this_year
-      dta[,-1] <- apply(dta[,-1], 2, as.numeric)
-      return(dta)      
+    if(exists("headers")){
+      names(dta) <- c("areal_unit", headers) %>%
+        str_replace_all(" ", "_") %>%
+        tolower      
+    }
+    
+    dta[,-1] <- apply(dta[,-1], 2, as.numeric)
+    dta <- dta %>%
+      gather(key="var", value="count", -1) %>%
+      separate(var, into=c("variable", "year"), sep="\\.") %>%
+      spread(variable, count) %>%
+      arrange(year, areal_unit)    
+  } else {
+    dta <- NULL
   }
-  
-  assign(
-    this_table_name, 
-    ddply(x, .(table_period), fn_inner, dir_loc_=dir_loc)
-  )     
-  return(get(this_table_name))
+ 
+  return(dta)
 }
 
-tables_year <- dlply(
-  subset(file_df, subset=period_structure=="year"),
+outputs <- dlply(
+  file_df, 
   .(table_name),
-  fn_year,
+  fn,
   dir_loc=sns_dir,
   .progress="text"
   )
 
-tables_year <- llply(tables_year, remove.vars, names="table_period", info=F)
-tables_year <- llply(tables_year, rename.vars, from="X", to="datazone", info=F)
-tables_year <- llply(tables_year, arrange, year, datazone)
-
-
-names(tables_year) <- tolower(
-  str_replace_all(
-    names(tables_year),  " ", "_"
-    )
-  )
+names(outputs) <- file_df$table_name  %>% unique
 
 # Spool to csv files
 
 fn <- function(this_table_name){
-  this_table <- tables_year[[this_table_name]]
+  this_table <- outputs[[this_table_name]]
   
   write.csv(
     this_table,
     file=paste0(
-      "output_data/by_year/",
+      "output_data/la/",
       this_table_name,
       ".csv"
-      ),
+    ),
     row.names=F
-    )
+  )
 }
 
-l_ply(names(tables_year), fn, .progress="text")
+l_ply(names(outputs), fn, .progress="text")
 
 
 
@@ -171,12 +190,12 @@ l_ply(names(tables_year), fn, .progress="text")
 file_df_qtrs <- subset(
   file_df,
   subset=period_structure=="year_quarter"
-  )
+)
 
 year_qtrs <- str_split(
   file_df_qtrs$table_period,
   "Q"
-  )
+)
 
 year_qtrs <- ldply(year_qtrs)
 names(year_qtrs) <- c("year", "quarter")
@@ -185,7 +204,7 @@ year_qtrs <- apply(year_qtrs, 2, as.numeric)
 file_df_qtrs <- cbind(
   file_df_qtrs,
   year_qtrs
-  )
+)
 
 
 fn_year_qtr <- function(x, dir_loc){
@@ -215,7 +234,7 @@ fn_year_qtr <- function(x, dir_loc){
     dta[,-1] <- apply(dta[,-1], 2, as.numeric)
     return(dta)      
   }
-
+  
   assign(
     this_table_name, 
     ddply(x, .(table_period), fn_inner, dir_loc_=dir_loc)
@@ -368,7 +387,7 @@ fn <- function(x){
   x <- recast(x, year + datazone ~ ..., id.var=c("year", "datazone"), 
               fun=sum,
               na.rm=T
-              )
+  )
   return(x)
 }
 
@@ -377,7 +396,7 @@ tables_year_qtr_to_year <- llply(
   tables_year_qtr,
   fn,
   .progress="text"
-  )
+)
 
 
 fn <- function(this_table_name){
@@ -403,7 +422,7 @@ fn <- function(x){
   x <- recast(x, year + datazone ~ ..., id.var=c("year", "datazone"), 
               fun=sum,
               na.rm=T
-              )
+  )
   return(x)
 }
 
@@ -466,14 +485,14 @@ fn_year_startend <- function(x, dir_loc){
     this_year_range <- xx$table_period[1]
     this_year_first <- as.numeric(
       str_sub(this_year_range, 1,4)
-      )
+    )
     
     this_year_last <- as.numeric(
       str_sub(this_year_range, 5,8)
-      )
+    )
     
     
-        
+    
     dta <- read.csv(
       paste(
         dir_loc_,
@@ -559,7 +578,7 @@ fn_year_start_end <- function(x, dir_loc){
     tmp <- str_split(this_year_range, "-")
     this_year_first <- as.numeric(tmp[[1]][1])
     this_year_last <- as.numeric(tmp[[1]][2])
-
+    
     
     
     
@@ -647,8 +666,8 @@ all_inputs <- ldply(all_inputs,
                       colnames(out) <- colnms; 
                       out <- data.frame(out); 
                       return(out)
-                      }
-                    ) 
+                    }
+) 
 
 # Now to link to the new tables
 
@@ -715,152 +734,11 @@ write.csv(
   location_id_desc, 
   file="output_data/metadata/var_names_and_dir_locations.csv", 
   row.names=F
-  )
+)
 
 write.csv(
   id_desc,
   file="output_data/metadata/all_available_var_details.csv",
   row.names=F
-  )
-
-
-###############################################################################################################################
-###############################################################################################################################
-
-# 19/2/2015
-
-# Some code to merge the data on urban_rural classifications found by Gavin
-
-rm(list=ls())
-
-# install.packages("plyr")
-# install.packages("stringr")
-# install.packages("tidyr")
-# install.packages("dplyr")
-
-
-require(plyr)
-require(stringr)
-require(tidyr)
-require(dplyr)
-
-base_dir <- "E:/Dropbox/Data/SNS/urban_rural"
-
-files_to_load <- list.files(path=paste(base_dir, "raw", sep="/"))
-
-fn <- function(x){
-  in_file <- read.csv(
-    paste(base_dir, "raw", x, sep="/")
-    ) %>% tbl_df()
-  
-  out <- in_file %>% 
-    rename(datazone=GeographyCode) %>% 
-    gather(key=year, value=urban_rural_class, -datazone)
-  
-  return(out)
-}
-
-output <- ldply(files_to_load, fn) %>% tbl_df
-output$year <- output$year %>% 
-  str_replace_all("X", "") %>% 
-  str_replace_all("\\.", "_") 
-
-write.csv(output, paste(base_dir, "tidied", "urban_rural.csv", sep="/"), row.names=F)
-
-
-
-
-###########
-
-# Var_identification ------------------------------------------------------
-
-
-# Not all variables are available at datazone level. The purpose of the code below is to:
-# report at what Geographic levels different variables are available.
-
-rm(list=ls())
-
-require(stringr)
-require(tidyr)
-require(plyr)
-require(dplyr)
-
-base_dir <- "E:/Dropbox/Data/SNS_FullData_CSV_19_1_2015/"
-
-
-files_to_parse <- list.files(base_dir)
-files_not_to_parse <- list.files(base_dir, pattern="^QuarterlyC[0-9]{1}R[0-9]{1}")
-files_to_parse <- files_to_parse[!(files_to_parse %in% files_not_to_parse)]
-files_not_to_parse <- list.files(base_dir, pattern="MetaData")
-files_to_parse <- files_to_parse[!(files_to_parse %in% files_not_to_parse)]
-
-
-fn <- function(x){
-  first_two_lines <- readLines(
-    paste0(base_dir, x),
-    n=2
-    ) %>%
-    str_split(",")
-  
-  file_name <- x
-  tokens <- file_name %>%
-    str_replace("_C[0-9]{1}R[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,4}\\.csv$", "") %>%
-    str_split("_") %>%
-    unlist
-
-
-  vars <- first_two_lines[[1]][-1]
-  years <- first_two_lines[[2]][-1] %>%
-    unique
-  au <- tokens[length(tokens)]  
-  
-  out <- expand.grid(var=vars, year=years)
-  if(dim(out)[1]>0){
-    out <- data.frame(out, outer_group=tokens[1], inner_group=tokens[2], areal_unit=au, file_name=file_name)    
-  } else {out <- NULL}
-  
-  
-  return(out)
-}
-
-var_compilation <- ldply(files_to_parse, fn, .progress="text") %>%
-  tbl_df
-
-var_by_au <- var_compilation  %>% 
-  distinct  %>% 
-  mutate(tmp=1)  %>% 
-  spread(areal_unit, tmp, fill=FALSE) %>%
-  select(-inner_group, -file_name) %>%
-  group_by(var) %>%
-  summarise(
-    LA=ifelse(sum(LA) > 0, 1, 0),
-    SC=ifelse(sum(SC) > 0, 1, 0),
-    ZN=ifelse(sum(ZN) > 0, 1, 0),
-    IG=ifelse(sum(IG) > 0, 1, 0),
-    H2=ifelse(sum(H2) > 0, 1, 0),
-    CH=ifelse(sum(CH) > 0, 1, 0),
-    HB=ifelse(sum(HB) > 0, 1, 0),
-    P2=ifelse(sum(P2) > 0, 1, 0),
-    RC=ifelse(sum(RC) > 0, 1, 0),
-    SP=ifelse(sum(SP) > 0, 1, 0),
-    MW=ifelse(sum(MW) > 0, 1, 0),
-    RL=ifelse(sum(RL) > 0, 1, 0),
-    W2=ifelse(sum(W2) > 0, 1, 0)
-    ) %>%
-  ungroup
-  
-var_details <- read.csv("E:/Dropbox/Data/SNS/2015_release/metadata/all_available_var_details.csv")  %>% 
-  select(var=Identifier, ShortTitle) %>% 
-  tbl_df
-
-var_by_au <- var_by_au  %>% 
-  left_join(var_details)  %>% 
-  select(1,15, 2:14)
-
-write.csv(var_by_au, file="E:/Dropbox/Data/SNS/2015_release/metadata/variables_by_areal_unit_availability.csv", row.names=F)
-
-# Merge with title 
-
-var_details <- read.csv("E:/Dropbox/Data/SNS/2015_release/metadata/all_available_var_details.csv")
-
+)
 
